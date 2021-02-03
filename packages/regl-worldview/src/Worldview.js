@@ -12,7 +12,7 @@ import * as React from "react";
 import ContainerDimensions from "react-container-dimensions";
 
 import { CameraListener, DEFAULT_CAMERA_STATE } from "./camera/index";
-import type { MouseHandler, Dimensions, Vec4, CameraState, CameraKeyMap, MouseEventEnum } from "./types";
+import type { MouseHandler, Dimensions, Vec4, Mat4, CameraState, CameraKeyMap, MouseEventEnum } from "./types";
 import { getNodeEnv } from "./utils/common";
 import { Ray } from "./utils/Raycast";
 import { WorldviewContext } from "./WorldviewContext";
@@ -35,6 +35,11 @@ export type BaseProps = {|
   cameraState?: CameraState,
   onCameraStateChange?: (CameraState) => void,
   defaultCameraState?: CameraState,
+
+  // Pass in custom camera matrices
+  cameraView?: Mat4,
+  cameraProjection?: Mat4,
+
   // interactions
   onDoubleClick?: MouseHandler,
   onMouseDown?: MouseHandler,
@@ -139,21 +144,23 @@ export class WorldviewBase extends React.Component<BaseProps, State> {
 
   componentDidUpdate() {
     const { worldviewContext } = this.state;
+    const { cameraState, cameraView, cameraProjection } = this.props;
+
     // update internal cameraState
-    if (this.props.cameraState) {
-      worldviewContext.cameraStore.setCameraState(this.props.cameraState);
+    if (cameraState != null) {
+      worldviewContext.cameraStore.setCameraState(cameraState);
     }
 
     // queue up a paint operation on the next frame, if we haven't already
     if (!this._tick && this.props.useFrames) {
       this._tick = requestAnimationFrame(() => {
         this._tick = undefined;
-        worldviewContext.paint();
+        worldviewContext.paint(cameraView, cameraProjection);
       });
     }
 
     if (!this.props.useFrames) {
-      worldviewContext.paint();
+      worldviewContext.paint(cameraView, cameraProjection);
     }
   }
 
@@ -206,10 +213,12 @@ export class WorldviewBase extends React.Component<BaseProps, State> {
       return handleWorldviewMouseInteraction(0, ray, e, worldviewHandler);
     }
 
+    const { cameraView, cameraProjection } = this.props;
+
     // reading hitmap is async so we need to persist the event to use later in the event handler
     (e: any).persist();
     worldviewContext
-      .readHitmap(canvasX, canvasY)
+      .readHitmap(canvasX, canvasY, cameraView, cameraProjection)
       .then((objectId) => {
         if (worldviewHandler) {
           handleWorldviewMouseInteraction(objectId, ray, e, worldviewHandler);

@@ -18,6 +18,7 @@ import type {
   CompiledReglCommand,
   CameraCommand,
   Vec4,
+  Mat4,
   CameraState,
   MouseEventEnum,
 } from "./types";
@@ -113,7 +114,12 @@ export class WorldviewContext {
     const regl = this._instrumentCommands(
       createREGL({
         canvas,
-        extensions: ["angle_instanced_arrays", "oes_texture_float", "oes_element_index_uint", "oes_standard_derivatives"],
+        extensions: [
+          "angle_instanced_arrays",
+          "oes_texture_float",
+          "oes_element_index_uint",
+          "oes_standard_derivatives",
+        ],
         profile: getNodeEnv() !== "production",
       })
     );
@@ -197,7 +203,7 @@ export class WorldviewContext {
     });
   };
 
-  paint() {
+  paint(cameraView: ?Mat4, cameraProjection: ?Mat4) {
     const start = Date.now();
     this.reglCommandObjects.forEach((cmd) => (cmd.stats.count = 0));
     if (!this.initializedData) {
@@ -205,7 +211,7 @@ export class WorldviewContext {
     }
     const { regl, camera } = this.initializedData;
     this._clearCanvas(regl);
-    camera.draw(this.cameraStore.state, () => {
+    camera.draw({ state: this.cameraStore.state, cameraView, cameraProjection }, () => {
       const x = Date.now();
       this._drawInput();
       this.counters.paint = Date.now() - x;
@@ -219,7 +225,7 @@ export class WorldviewContext {
 
   _debouncedPaint = debounce(this.paint, 10);
 
-  readHitmap(canvasX: number, canvasY: number): Promise<number> {
+  readHitmap(canvasX: number, canvasY: number, cameraView: ?Mat4, cameraProjection: ?Mat4): Promise<number> {
     if (!this.initializedData) {
       return new Promise((_, reject) => reject(new Error("regl data not initialized yet")));
     }
@@ -242,7 +248,7 @@ export class WorldviewContext {
         regl.clear({ color: [0, 0, 0, 1], depth: 1 });
 
         // draw the hitmap components to the framebuffer
-        camera.draw(this.cameraStore.state, () => {
+        camera.draw({ state: this.cameraStore.state, cameraView, cameraProjection }, () => {
           this._drawInput(true);
 
           let objectId = 0;
